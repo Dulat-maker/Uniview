@@ -76,6 +76,7 @@ async function getEntities(ids: string[], props: string, budget: Budget, extra: 
   const out: Record<string, Entity> = {};
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i + 50));
+  let lastError: unknown;
   const results = await mapLimit(chunks, 3, async (chunk) => {
     const data = await fetchJson<{ entities: Record<string, Entity> }>(
       buildUrl(WIKIDATA_API, {
@@ -87,12 +88,17 @@ async function getEntities(ids: string[], props: string, budget: Budget, extra: 
         ...extra,
       }),
       budget
-    );
+    ).catch((err) => {
+      lastError = err;
+      throw err;
+    });
     Object.assign(out, data.entities);
     return true;
   });
   // A failed request must not look like "this item doesn't exist" (that would say "not found").
-  if (results.some((r) => r === undefined)) throw new Error("Wikidata request failed");
+  if (results.some((r) => r === undefined)) {
+    throw new Error(`Wikidata request failed: ${lastError instanceof Error ? lastError.message : "unknown"}`);
+  }
   return out;
 }
 

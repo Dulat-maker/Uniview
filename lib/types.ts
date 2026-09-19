@@ -186,7 +186,7 @@ export type ProfileStage = "search" | "verification" | "categories" | "profile";
 export type ProfileEvent =
   | { type: "stage"; stage: ProfileStage }
   | { type: "result"; profile: UniversityProfile }
-  | { type: "error"; code: "not_found" | "upstream" | "timeout"; message: string };
+  | { type: "error"; code: "not_found" | "upstream" | "timeout"; message: string; detail?: string };
 
 /** One country's everyday price level (World Bank), used by /api/prices and the cost-of-living card. */
 export type CountryPrice = { iso2: string; name: string; ratio: number; year: string; lcuPerUsd: number };

@@ -32,7 +32,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/university/[
           send({ type: "error", code: "not_found", message: "University not found" });
         } else {
           console.error("profile failed", qid, err);
-          send({ type: "error", code: "upstream", message: "Open data sources did not respond" });
+          // The short reason (e.g. "HTTP 429 for www.wikidata.org") helps diagnose hosting problems; no secrets in it.
+          const detail = err instanceof Error ? err.message.slice(0, 200) : undefined;
+          send({ type: "error", code: "upstream", message: "Open data sources did not respond", detail });
         }
       } finally {
         if (open) controller.close();

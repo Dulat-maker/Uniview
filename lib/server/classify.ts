@@ -11,7 +11,8 @@ export type SourceKind =
   | "city_category"
   | "geo_search"
   | "city_geo_search"
-  | "text_search";
+  | "text_search"
+  | "sports_venue";
 
 export type Hit = { file: CommonsFile; sources: { kind: SourceKind; detail?: string }[] };
 
@@ -23,6 +24,8 @@ const SOURCE_SCORE: Record<SourceKind, number> = {
   geo_search: 0.3,
   city_geo_search: 0.3,
   text_search: 0.15,
+  // Wikidata says this venue belongs to the university, so its own category is solid evidence.
+  sports_venue: 0.65,
 };
 
 const CITY_SOURCES: SourceKind[] = ["city_category", "city_geo_search"];
@@ -52,6 +55,12 @@ const IRRELEVANT_DESCRIPTION = /\b(charts?|infographics?|diagrams?|logotype|book
 // category; keep such an image only if its title or categories show a lab, equipment or the campus.
 const SCIENCE_CONTEST = /science (photo )?competition/;
 const CONTEST_KEEP = /laborator|\blabs?\b|equipment|campus|building|students|лаборатор|оборудован|кампус/;
+// Scans and instrument output are not photos of a place: old prints and manuscripts, archive
+// documents, and images made by a microscope or a spectrometer. Universities upload plenty of them.
+const OLD_PRINT = /engraving|engraved|lithograph|etching|woodcut|mezzotint|\bprints? by\b|\bplate [ivxlcd0-9]|manuscript|handwritt|typescript|title page|\bfolio\b|illuminated|watercolou?r|drawings? [(]|drawings? of|architectural drawing|drawn by|sketch by|wellcome|\bv\d{5,}\b|scanned|facsimile|\bletters? (of|from|to)\b|correspondence|\bdiplomas?\b|certificate of|charter of|\bdeed \b|(?<![\u0430-\u044f])рукопис|гравюр|литограф/;
+const INSTRUMENT_IMAGE = /microscop|micrograph|\bsem images\b|\btem images\b|electron microscope|spectrogram|\bspectra\b|spectrum of|chromatograp|electrophoresis|petri dish|cell culture|crystal structure|diffraction|nanotube|nanoparticle|nanowire|herbarium|holotype|type specimen|микроскоп|спектр/;
+// Photos from Geograph are always real outdoor photographs, whatever words the caption uses.
+const REAL_PHOTO_SOURCE = /geograph/;
 // A category that is just a person's name and also appears in the title = a portrait of that person.
 const PERSON_NAME = /^[A-ZА-ЯЁ][a-zа-яё'’-]+(?: [A-ZА-ЯЁ][a-zа-яё'’-]+){1,2}$/;
 const PLACE_WORD =
@@ -105,6 +114,7 @@ export function isIrrelevant(file: CommonsFile) {
   return (
     IRRELEVANT.test(titleAndCats) ||
     NOT_CAMPUS.test(titleAndCats) ||
+    (!REAL_PHOTO_SOURCE.test(titleAndCats) && (OLD_PRINT.test(titleAndCats) || INSTRUMENT_IMAGE.test(titleAndCats))) ||
     PEOPLE_CATEGORY.test(cats) ||
     IRRELEVANT_DESCRIPTION.test(normalize(file.description ?? "")) ||
     (SCIENCE_CONTEST.test(cats) && !CONTEST_KEEP.test(titleAndCats.replace(SCIENCE_CONTEST, " "))) ||
@@ -241,7 +251,8 @@ export function categorize(hit: Hit, universityNames: string[]): { category: Pho
   const has = (rule: RegExp, strong?: RegExp) => evidence(parts, rule, strong) >= 2;
 
   const tags: PhotoTag[] = [];
-  if (has(ATHLETICS)) tags.push("athletics");
+  // A venue Wikidata links to the university is a sports facility by definition.
+  if (hit.sources.some((s) => s.kind === "sports_venue") || has(ATHLETICS)) tags.push("athletics");
   if (has(DORMITORY)) tags.push("dormitory");
   if (has(LABS, LABS_STRONG_DESCRIPTION)) tags.push("labs");
   if (has(STUDENT_LIFE)) tags.push("studentLife");

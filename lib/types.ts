@@ -19,6 +19,7 @@ export type ReasonCode =
   | "geo_search"
   | "city_geo_search"
   | "text_search"
+  | "sports_venue"
   | "near_campus"
   | "far_from_campus"
   | "near_city"
@@ -85,7 +86,7 @@ export type SearchResponse = {
 };
 
 /** Bump when the profile shape changes so old cache files are rebuilt. */
-export const PROFILE_VERSION = 6;
+export const PROFILE_VERSION = 7;
 
 /** City and living facts from free open-data APIs; each part is missing when no data was found. */
 export type CityFacts = {

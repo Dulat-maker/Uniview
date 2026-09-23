@@ -16,6 +16,7 @@ import {
 } from "./classify";
 import { filesByName, filesInCategory, filesNear, searchFiles, subcategories, type CommonsFile } from "./commons";
 import { getCityFacts } from "./city-facts";
+import { findSportsVenues } from "./venues";
 import { readJson, writeJson } from "./storage";
 import { removeDuplicates } from "./dedupe";
 import { Budget, haversineKm, mapLimit } from "./http";
@@ -147,6 +148,16 @@ async function collectCity(uni: UniversityInfo, c: Collector, budget: Budget) {
   }
 }
 
+/** Photos of the university's own stadiums, arenas and sports centres (Wikidata → Commons category). */
+async function collectSportsVenues(uni: UniversityInfo, c: Collector, budget: Budget) {
+  const venues = await safe(findSportsVenues(uni.qid, budget));
+  if (!venues?.length) return;
+  await mapLimit(venues.slice(0, 3), 3, async (venue) => {
+    const files = await safe(filesInCategory(venue.commonsCategory, 12, budget));
+    c.add(files, "sports_venue", venue.name);
+  });
+}
+
 async function collect(uni: UniversityInfo, budget: Budget) {
   const c = createCollector();
   const searchNames = [...new Set([uni.label, ...uni.names.filter((n) => n.length >= 8)])].slice(0, 2);
@@ -156,6 +167,7 @@ async function collect(uni: UniversityInfo, budget: Budget) {
     uni.coords ? safe(filesNear(uni.coords, 1000, 50, budget)).then((f) => c.add(f, "geo_search")) : null,
     ...searchNames.map((name) => safe(searchFiles(name, 20, budget)).then((f) => c.add(f, "text_search", name))),
     collectCity(uni, c, budget),
+    collectSportsVenues(uni, c, budget),
     uni.image ? safe(filesByName([uni.image], budget)).then((f) => c.add(f, "wikidata_image")) : null,
   ]);
   return c;
@@ -283,7 +295,7 @@ async function findPhotos(uni: UniversityInfo, budget: Budget, onStage: (stage: 
     const f = hit.file;
     const measured = deduped.analysis.get(f.sha1);
     // The most specific Commons subcategory names the place (e.g. a particular dorm building).
-    const place = [...hit.sources].reverse().find((s) => s.kind === "university_subcategory")?.detail;
+    const place = [...hit.sources].reverse().find((s) => s.kind === "university_subcategory" || s.kind === "sports_venue")?.detail;
     return {
       id: f.pageid,
       title: f.title,
